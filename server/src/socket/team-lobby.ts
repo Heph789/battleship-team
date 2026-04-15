@@ -104,7 +104,7 @@ export function registerTeamLobbyHandlers(
     const state: ServerGameState = {
       players: {},
       boards: {},
-      currentTurn: teamState.turnOrder[0],
+      currentTurn: "",
       aiState: null,
       teamState,
     };

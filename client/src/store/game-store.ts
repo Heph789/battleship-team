@@ -8,10 +8,10 @@ import {
   type Orientation,
   type PlayerBoard,
   type ShipPlacement,
-  type ShipPointValues,
   type ShipType,
   type ShotResult,
   type TeamId,
+  type TeamShotResult,
   validatePlacement,
 } from "@battleship/shared";
 import {
@@ -47,12 +47,14 @@ interface GameStore {
   // Team mode state
   teamId: TeamId | null;
   teams: Record<TeamId, { playerIds: string[]; displayNames: string[] }> | null;
-  turnOrder: string[] | null;
   teamBoard: PlayerBoard;
-  enemyTeamBoard: PlayerBoard;
-  yourScore: number;
-  yourPointValues: ShipPointValues | null;
-  gameOverScores: Record<string, number> | null;
+  myEnemyView: PlayerBoard;
+  hitCount: number;
+  currentTeamTurn: TeamId | null;
+  sharePromptResult: TeamShotResult | null;
+  waitingForTeammate: boolean;
+  wastedCells: Coordinate[];
+  gameOverHitCounts: Record<string, number> | null;
   mvp: string | null;
   teammateReady: boolean;
   teamPlayerCount: number;
@@ -87,6 +89,8 @@ interface GameStore {
 
   // Actions: firing
   fireShot: (coord: Coordinate) => void;
+  teamFire: (coord: Coordinate) => void;
+  teamShareDecision: (share: boolean) => void;
 
   // Actions: post-game
   rematch: () => void;
@@ -198,7 +202,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     });
 
     socket.on("opponent_fired", ({ coordinate, result, shipType, gameOver }) => {
-      const { yourBoard, userId } = get();
+      const { yourBoard } = get();
       const newBoard = { ...yourBoard };
       if (result === "miss") {
         newBoard.misses = [...newBoard.misses, coordinate];
@@ -317,80 +321,161 @@ export const useGameStore = create<GameStore>((set, get) => {
       set({ teammateReady: true });
     });
 
-    socket.on("team_both_ready", ({ currentTurn, turnOrder, yourPointValues }) => {
-      const { userId, placementShips } = get();
+    socket.on("team_both_ready", ({ currentTeamTurn }) => {
+      const { teamId, placementShips } = get();
+      const isMyTeamsTurn = currentTeamTurn === teamId;
       set({
         gameStatus: "in_progress",
-        currentTurn,
-        turnOrder,
-        isYourTurn: currentTurn === userId,
-        yourPointValues,
+        currentTeamTurn,
+        isYourTurn: isMyTeamsTurn,
         waitingForOpponent: false,
         teamBoard: { ships: placementShips, hits: [], misses: [] },
-        enemyTeamBoard: emptyBoard,
-        shotMessage:
-          currentTurn === userId
-            ? "Your turn — fire at the enemy grid!"
-            : "Waiting for other players...",
+        myEnemyView: emptyBoard,
+        hitCount: 0,
+        waitingForTeammate: false,
+        sharePromptResult: null,
+        shotMessage: isMyTeamsTurn
+          ? "Your team's turn — fire!"
+          : "Enemy team's turn...",
       });
     });
 
-    socket.on("team_fire_result", ({ coordinate, result, shipType, sunkShip, gameOver, firerUserId, firedAtTeam, yourScore }) => {
-      const { teamId, teamBoard, enemyTeamBoard, userId } = get();
-      const isFiredAtMyTeam = firedAtTeam === teamId;
-
-      if (isFiredAtMyTeam) {
-        // Shot landed on our team's board
-        const newBoard = { ...teamBoard };
-        if (result === "miss") {
-          newBoard.misses = [...newBoard.misses, coordinate];
-        } else {
-          newBoard.hits = [...newBoard.hits, coordinate];
-        }
-        set({ teamBoard: newBoard });
-      } else {
-        // Shot landed on enemy team's board
-        const newBoard = { ...enemyTeamBoard };
-        if (result === "miss") {
-          newBoard.misses = [...newBoard.misses, coordinate];
-        } else {
-          newBoard.hits = [...newBoard.hits, coordinate];
-        }
-        if (sunkShip) {
-          newBoard.ships = [...newBoard.ships, sunkShip];
-        }
-        set({ enemyTeamBoard: newBoard });
-      }
-
-      if (yourScore !== undefined) {
-        set({ yourScore });
-      }
-
-      const prefix = firerUserId === userId ? "You" : "Player";
-      const msg = shotResultMessage({ coordinate, result, shipType }, prefix);
-      set({ shotMessage: msg });
+    socket.on("team_turn_start", ({ currentTeamTurn }) => {
+      const { teamId } = get();
+      const isMyTeamsTurn = currentTeamTurn === teamId;
+      set({
+        currentTeamTurn,
+        isYourTurn: isMyTeamsTurn,
+        waitingForTeammate: false,
+        sharePromptResult: null,
+        isOpponentThinking: !isMyTeamsTurn,
+        shotMessage: isMyTeamsTurn
+          ? "Your team's turn — fire!"
+          : "Enemy team's turn...",
+      });
     });
 
-    socket.on("team_game_over", ({ winningTeam, scores, mvp }) => {
+    socket.on("team_shot_result", (data) => {
+      const { myEnemyView } = get();
+
+      // Update your private view with your shot result
+      if (data.result === "miss") {
+        set({
+          myEnemyView: {
+            ...myEnemyView,
+            misses: [...myEnemyView.misses, data.coordinate],
+          },
+        });
+      } else if (data.result === "hit" || data.result === "sunk") {
+        const updatedView = {
+          ...myEnemyView,
+          hits: [...myEnemyView.hits, data.coordinate],
+        };
+        if (data.sunkShip) {
+          updatedView.ships = [...myEnemyView.ships, data.sunkShip];
+        }
+        set({
+          myEnemyView: updatedView,
+          hitCount: get().hitCount + 1,
+        });
+      } else if (data.result === "wasted") {
+        // Wasted shot — mark as hit on view (it was already hit)
+        const updatedView = { ...myEnemyView };
+        const key = `${data.coordinate.x},${data.coordinate.y}`;
+        const alreadyInHits = myEnemyView.hits.some(
+          (c) => `${c.x},${c.y}` === key,
+        );
+        if (!alreadyInHits) {
+          updatedView.hits = [...updatedView.hits, data.coordinate];
+        }
+        if (data.revealedSunkShip) {
+          updatedView.ships = [...updatedView.ships, data.revealedSunkShip];
+        }
+        set({
+          myEnemyView: updatedView,
+          wastedCells: [...get().wastedCells, data.coordinate],
+        });
+      }
+
+      if (data.phase === "share_prompt") {
+        set({
+          sharePromptResult: data,
+          waitingForTeammate: false,
+          shotMessage: `You ${data.result === "sunk" ? "sunk" : "hit"} a ship! Share with teammate?`,
+        });
+      } else {
+        const msg = data.result === "wasted"
+          ? "Wasted shot — already hit!"
+          : data.result === "miss"
+            ? "Miss."
+            : data.result === "sunk"
+              ? `Sunk the ${SHIP_LABELS[data.shipType!]}!`
+              : "Hit!";
+        set({
+          waitingForTeammate: false,
+          shotMessage: msg,
+        });
+      }
+    });
+
+    socket.on("team_waiting_for_teammate", () => {
+      set({
+        waitingForTeammate: true,
+        shotMessage: "Waiting for teammate to fire...",
+      });
+    });
+
+    socket.on("team_teammate_shot_done", () => {
+      // Teammate has fired, results are incoming
+    });
+
+    socket.on("team_share_received", ({ coordinate, result, shipType, sunkShip }) => {
+      const { myEnemyView } = get();
+      const updatedView = {
+        ...myEnemyView,
+        hits: [...myEnemyView.hits, coordinate],
+      };
+      if (sunkShip) {
+        updatedView.ships = [...myEnemyView.ships, sunkShip];
+      }
+      set({
+        myEnemyView: updatedView,
+        shotMessage: `Teammate shared: ${result === "sunk" ? `Sunk the ${SHIP_LABELS[shipType!]}!` : "Hit!"}`,
+      });
+    });
+
+    socket.on("team_round_complete", ({ nextTeamTurn }) => {
+      const { teamId } = get();
+      const isMyTeamsTurn = nextTeamTurn === teamId;
+      set({
+        currentTeamTurn: nextTeamTurn,
+        isYourTurn: isMyTeamsTurn,
+        waitingForTeammate: false,
+        sharePromptResult: null,
+        isOpponentThinking: !isMyTeamsTurn,
+      });
+    });
+
+    socket.on("team_opponent_turn_result", ({ hitsOnYourBoard, missesOnYourBoard, sunkShips }) => {
+      const { teamBoard } = get();
+      set({
+        teamBoard: {
+          ...teamBoard,
+          hits: [...teamBoard.hits, ...hitsOnYourBoard],
+          misses: [...teamBoard.misses, ...missesOnYourBoard],
+        },
+      });
+    });
+
+    socket.on("team_game_over", ({ winningTeam, hitCounts, mvp }) => {
       set({
         gameStatus: "completed",
-        gameOverScores: scores,
+        gameOverHitCounts: hitCounts,
         mvp,
         winnerId: winningTeam,
         isOpponentThinking: false,
-      });
-    });
-
-    socket.on("team_turn_update", ({ currentTurn }) => {
-      const { userId } = get();
-      set({
-        currentTurn,
-        isYourTurn: currentTurn === userId,
-        isOpponentThinking: currentTurn !== userId,
-        shotMessage:
-          currentTurn === userId
-            ? "Your turn — fire at the enemy grid!"
-            : "Waiting for other players...",
+        sharePromptResult: null,
+        waitingForTeammate: false,
       });
     });
   }
@@ -414,12 +499,14 @@ export const useGameStore = create<GameStore>((set, get) => {
     hoverCell: null,
     teamId: null,
     teams: null,
-    turnOrder: null,
     teamBoard: emptyBoard,
-    enemyTeamBoard: emptyBoard,
-    yourScore: 0,
-    yourPointValues: null,
-    gameOverScores: null,
+    myEnemyView: emptyBoard,
+    hitCount: 0,
+    currentTeamTurn: null,
+    sharePromptResult: null,
+    waitingForTeammate: false,
+    wastedCells: [],
+    gameOverHitCounts: null,
     mvp: null,
     teammateReady: false,
     teamPlayerCount: 0,
@@ -540,16 +627,19 @@ export const useGameStore = create<GameStore>((set, get) => {
         yourBoard: emptyBoard,
         opponentBoard: emptyBoard,
         teamBoard: emptyBoard,
-        enemyTeamBoard: emptyBoard,
+        myEnemyView: emptyBoard,
         placementShips: [],
         activeShipType: SHIP_TYPES[0],
         activeOrientation: "horizontal",
         errorMessage: null,
-        yourScore: 0,
-        yourPointValues: null,
-        gameOverScores: null,
+        hitCount: 0,
+        gameOverHitCounts: null,
         mvp: null,
         teammateReady: false,
+        sharePromptResult: null,
+        waitingForTeammate: false,
+        wastedCells: [],
+        currentTeamTurn: null,
       });
       getSocket().emit("join_team_game", { code: code.toUpperCase() });
     },
@@ -599,6 +689,18 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (gameStatus !== "in_progress" || !isYourTurn || isOpponentThinking)
         return;
       getSocket().emit("fire", { x: coord.x, y: coord.y });
+    },
+
+    teamFire: (coord) => {
+      const { gameStatus, isYourTurn, waitingForTeammate, sharePromptResult } = get();
+      if (gameStatus !== "in_progress" || !isYourTurn || waitingForTeammate || sharePromptResult)
+        return;
+      getSocket().emit("team_fire", { x: coord.x, y: coord.y });
+    },
+
+    teamShareDecision: (share) => {
+      set({ sharePromptResult: null });
+      getSocket().emit("team_share_decision", { share });
     },
 
     rematch: () => {

@@ -14,6 +14,7 @@ type CellProps = {
   state: CellState;
   isGhost?: boolean;
   isInvalid?: boolean;
+  isWasted?: boolean;
   interactive?: boolean;
   onClick?: () => void;
   onMouseEnter?: () => void;
@@ -23,6 +24,7 @@ export default function Cell({
   state,
   isGhost,
   isInvalid,
+  isWasted,
   interactive,
   onClick,
   onMouseEnter,
@@ -32,6 +34,8 @@ export default function Cell({
 
   if (isGhost) {
     className += isInvalid ? " bg-red-400/50" : " bg-green-400/50";
+  } else if (isWasted) {
+    className += " bg-yellow-700 ring-2 ring-inset ring-yellow-400";
   } else {
     className += ` ${CELL_STYLES[state]}`;
   }
@@ -42,8 +46,9 @@ export default function Cell({
 
   return (
     <div className={className} onClick={onClick} onMouseEnter={onMouseEnter}>
-      {state === "hit" && "✕"}
-      {state === "sunk" && "✕"}
+      {isWasted && <span className="text-yellow-300">✕</span>}
+      {!isWasted && state === "hit" && "✕"}
+      {!isWasted && state === "sunk" && "✕"}
       {state === "miss" && (
         <span className="w-2 h-2 rounded-full bg-slate-400" />
       )}

@@ -5,7 +5,7 @@ import type {
   TeamGameState,
   TeamId,
 } from "@battleship/shared";
-import { initAI, generatePointValues } from "@battleship/shared";
+import { initAI } from "@battleship/shared";
 
 export function createInitialState(
   user1Id: string,
@@ -80,12 +80,13 @@ export function createTeamInitialState(
 ): TeamGameState {
   const allPlayers = [...teamA, ...teamB];
   const players: TeamGameState["players"] = {};
+  const playerViews: TeamGameState["playerViews"] = {};
   for (const id of allPlayers) {
     players[id] = {
       ready: false,
-      pointValues: generatePointValues(),
-      score: 0,
+      hitCount: 0,
     };
+    playerViews[id] = { ships: [], hits: [], misses: [] };
   }
 
   return {
@@ -97,10 +98,13 @@ export function createTeamInitialState(
       teamA: { ships: [], hits: [], misses: [] },
       teamB: { ships: [], hits: [], misses: [] },
     },
+    playerViews,
     players,
     placementShips: { teamA: [], teamB: [] },
-    turnOrder: [teamA[0], teamB[0], teamA[1], teamB[1]],
-    currentTurnIndex: 0,
+    currentTeamTurn: "teamA",
+    turnPhase: "waiting",
+    pendingShots: {},
+    pendingResults: {},
   };
 }
 
@@ -116,16 +120,27 @@ export function getOpponentTeam(teamId: TeamId): TeamId {
   return teamId === "teamA" ? "teamB" : "teamA";
 }
 
-export function advanceTurn(teamState: TeamGameState): TeamGameState {
+export function advanceTeamTurn(teamState: TeamGameState): TeamGameState {
+  const nextTeam: TeamId = teamState.currentTeamTurn === "teamA" ? "teamB" : "teamA";
   return {
     ...teamState,
-    currentTurnIndex:
-      (teamState.currentTurnIndex + 1) % teamState.turnOrder.length,
+    currentTeamTurn: nextTeam,
+    turnPhase: "firing",
+    pendingShots: {},
+    pendingResults: {},
   };
 }
 
-export function getCurrentTurnUserId(teamState: TeamGameState): string {
-  return teamState.turnOrder[teamState.currentTurnIndex];
+export function bothPlayersHaveFired(teamState: TeamGameState): boolean {
+  const currentTeam = teamState.currentTeamTurn;
+  const playerIds = teamState.teams[currentTeam].playerIds;
+  return playerIds.every((id) => teamState.pendingShots[id] != null);
+}
+
+export function getPlayersNeedingShareDecision(teamState: TeamGameState): string[] {
+  return Object.entries(teamState.pendingResults)
+    .filter(([_, result]) => result != null && (result.result === "hit" || result.result === "sunk"))
+    .map(([id]) => id);
 }
 
 export function allTeamPlayersLockedIn(teamState: TeamGameState): boolean {

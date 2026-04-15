@@ -11,8 +11,8 @@ export default function TeamGameOverView() {
   const teamId = useGameStore((s) => s.teamId);
   const winnerId = useGameStore((s) => s.winnerId); // this is winningTeam in team mode
   const teamBoard = useGameStore((s) => s.teamBoard);
-  const enemyTeamBoard = useGameStore((s) => s.enemyTeamBoard);
-  const gameOverScores = useGameStore((s) => s.gameOverScores);
+  const myEnemyView = useGameStore((s) => s.myEnemyView);
+  const gameOverHitCounts = useGameStore((s) => s.gameOverHitCounts);
   const mvp = useGameStore((s) => s.mvp);
   const teams = useGameStore((s) => s.teams);
   const returnToMenu = useGameStore((s) => s.returnToMenu);
@@ -20,7 +20,7 @@ export default function TeamGameOverView() {
   const teamWon = winnerId === teamId;
 
   const teamGrid = buildCellGrid(teamBoard, true);
-  const enemyGrid = buildCellGrid(enemyTeamBoard, true);
+  const enemyGrid = buildCellGrid(myEnemyView, true);
 
   function handleMenu() {
     returnToMenu();
@@ -40,8 +40,8 @@ export default function TeamGameOverView() {
           : "The enemy team sunk all your ships!"}
       </p>
 
-      {/* Scoreboard */}
-      {gameOverScores && teams && (
+      {/* Hit count scoreboard */}
+      {gameOverHitCounts && teams && (
         <div className="flex gap-8">
           {(["teamA", "teamB"] as const).map((tid) => (
             <div key={tid} className="flex flex-col items-center gap-2">
@@ -54,7 +54,7 @@ export default function TeamGameOverView() {
                 {tid === winnerId && " \u2605"}
               </h3>
               {teams[tid].playerIds.map((pid, i) => {
-                const score = gameOverScores[pid] ?? 0;
+                const hits = gameOverHitCounts[pid] ?? 0;
                 const isMvp = pid === mvp;
                 const isMe = pid === userId;
                 const name = teams[tid].displayNames[i] ?? pid.slice(0, 8);
@@ -69,7 +69,7 @@ export default function TeamGameOverView() {
                       {name}
                       {isMe && " (you)"}
                     </span>
-                    <span className="font-mono">{score}pts</span>
+                    <span className="font-mono">{hits} hits</span>
                     {isMvp && <span>MVP</span>}
                   </div>
                 );
