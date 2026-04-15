@@ -11,11 +11,11 @@ import {
   type ShipType,
   type ShotResult,
   validatePlacement,
-  buildCellGrid,
 } from "@battleship/shared";
 import {
   connectSocket,
   getSocket,
+  getSessionToken,
   setSessionToken,
   type TypedSocket,
 } from "@/lib/socket";
@@ -83,6 +83,8 @@ function shotResultMessage(result: ShotResult, prefix: string): string {
 }
 
 export const useGameStore = create<GameStore>((set, get) => {
+  let initialized = false;
+
   // Set up socket listeners once the store is created
   function bindSocketListeners(socket: TypedSocket) {
     socket.on("game_created", ({ gameId, code }) => {
@@ -284,11 +286,17 @@ export const useGameStore = create<GameStore>((set, get) => {
     errorMessage: null,
 
     initSession: async () => {
+      if (initialized) return;
+      initialized = true;
+
       const SERVER_URL =
         process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:3001";
-      const res = await fetch(`${SERVER_URL}/api/session`, {
-        credentials: "include",
-      });
+      const existingToken = getSessionToken();
+      const headers: Record<string, string> = {};
+      if (existingToken) {
+        headers["Authorization"] = `Bearer ${existingToken}`;
+      }
+      const res = await fetch(`${SERVER_URL}/api/session`, { headers });
       const { userId, token } = await res.json();
       if (token) setSessionToken(token);
       set({ userId, connected: true });
