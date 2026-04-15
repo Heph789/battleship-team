@@ -23,10 +23,10 @@ export function createSocketServer(
   clientOrigin: string,
 ) {
   const io: TypedServer = new SocketServer(httpServer, {
-    cors: { origin: clientOrigin, credentials: true },
+    cors: { origin: clientOrigin },
   });
 
-  // Auth middleware: extract userId from session cookie
+  // Auth middleware: extract userId from token
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token as string | undefined;
     if (!token) {
