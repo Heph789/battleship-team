@@ -1,0 +1,1 @@
+- should be able to rejoin a match if booted off somehow
