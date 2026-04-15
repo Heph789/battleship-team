@@ -12,7 +12,6 @@ import { db, schema, findGame } from "../db/index.js";
 import {
   getTeamForPlayer,
   allTeamPlayersLockedIn,
-  getCurrentTurnUserId,
 } from "../game/state.js";
 
 export function registerTeamPlacementHandlers(
@@ -159,7 +158,8 @@ export function registerTeamPlacementHandlers(
         misses: [],
       };
 
-      state.currentTurn = getCurrentTurnUserId(teamState);
+      teamState.turnPhase = "firing";
+      teamState.currentTeamTurn = "teamA";
 
       db.update(schema.game)
         .set({
@@ -170,21 +170,9 @@ export function registerTeamPlacementHandlers(
         .where(eq(schema.game.id, gameId))
         .run();
 
-      // Emit to each player individually with their private point values
-      const allPlayerIds = [
-        ...teamState.teams.teamA.playerIds,
-        ...teamState.teams.teamB.playerIds,
-      ];
-      for (const playerId of allPlayerIds) {
-        const sockets = getSocketsForUser(io, gameId, playerId);
-        for (const s of sockets) {
-          s.emit("team_both_ready", {
-            currentTurn: state.currentTurn,
-            turnOrder: teamState.turnOrder,
-            yourPointValues: teamState.players[playerId].pointValues,
-          });
-        }
-      }
+      io.to(gameId).emit("team_both_ready", {
+        currentTeamTurn: "teamA",
+      });
     } else {
       db.update(schema.game)
         .set({

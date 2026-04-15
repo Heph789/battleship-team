@@ -7,7 +7,6 @@ import {
   type Orientation,
   type PlayerBoard,
   type ShipPlacement,
-  type ShipPointValues,
   type ShipType,
   type ShotResult,
 } from "./types";
@@ -158,14 +157,6 @@ export function buildCellGrid(
   }
 
   return grid;
-}
-
-export function generatePointValues(): ShipPointValues {
-  const values = {} as ShipPointValues;
-  for (const type of SHIP_TYPES) {
-    values[type] = Math.floor(Math.random() * 5) + 1;
-  }
-  return values;
 }
 
 // Returns all sunk ship types on a board

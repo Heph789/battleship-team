@@ -10,6 +10,7 @@ type BoardProps = {
   interactive?: boolean;
   ghostCells?: Coordinate[];
   invalidGhost?: boolean;
+  wastedCells?: Coordinate[];
   onCellClick?: (coord: Coordinate) => void;
   onCellHover?: (coord: Coordinate) => void;
   onMouseLeave?: () => void;
@@ -20,12 +21,16 @@ export default function Board({
   interactive = false,
   ghostCells,
   invalidGhost,
+  wastedCells,
   onCellClick,
   onCellHover,
   onMouseLeave,
 }: BoardProps) {
   const ghostSet = new Set(
     (ghostCells ?? []).map((c) => `${c.x},${c.y}`),
+  );
+  const wastedSet = new Set(
+    (wastedCells ?? []).map((c) => `${c.x},${c.y}`),
   );
 
   return (
@@ -52,12 +57,14 @@ export default function Board({
           </div>
           {Array.from({ length: BOARD_SIZE }, (_, x) => {
             const isGhost = ghostSet.has(`${x},${y}`);
+            const isWasted = wastedSet.has(`${x},${y}`);
             return (
               <Cell
                 key={`${x},${y}`}
                 state={grid[y][x]}
                 isGhost={isGhost}
                 isInvalid={isGhost && invalidGhost}
+                isWasted={isWasted}
                 interactive={interactive}
                 onClick={() => onCellClick?.({ x, y })}
                 onMouseEnter={() => onCellHover?.({ x, y })}

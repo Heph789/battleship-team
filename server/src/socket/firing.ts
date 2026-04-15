@@ -10,7 +10,6 @@ import {
 import type { TypedServer, TypedSocket } from "./index.js";
 import { db, schema, findGame } from "../db/index.js";
 import { applyShot, getOpponentId } from "../game/state.js";
-import { handleTeamFire } from "./team-firing.js";
 
 const AI_USER_ID = "ai";
 
@@ -32,7 +31,7 @@ export function registerFiringHandlers(io: TypedServer, socket: TypedSocket) {
     }
 
     if (gameRow.mode === "team") {
-      handleTeamFire(io, socket, gameRow, data);
+      socket.emit("error", { message: "Use team_fire for team mode" });
       return;
     }
 
