@@ -80,6 +80,7 @@ export type AIState = {
   mode: AIMode;
   targetQueue: Coordinate[];
   shotsTaken: string[];
+  unsunkHits: Coordinate[];
 };
 
 export type ServerGameState = {
