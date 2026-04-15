@@ -92,6 +92,14 @@ export function registerLobbyHandlers(io: TypedServer, socket: TypedSocket) {
     socket.to(gameRow.id).emit("opponent_joined");
   });
 
+  socket.on("leave_game", () => {
+    const gid = socket.data.gameId;
+    if (gid) {
+      socket.leave(gid);
+      socket.data.gameId = undefined;
+    }
+  });
+
   socket.on("reconnect_game", (data: { gameId: string }) => {
     const gameRow = findGame(data.gameId);
     if (!gameRow) {

@@ -96,6 +96,7 @@ export interface ClientToServerEvents {
   create_game: (data: { mode: GameMode }) => void;
   join_game: (data: { code: string }) => void;
   reconnect_game: (data: { gameId: string }) => void;
+  leave_game: () => void;
   place_ships: (data: { ships: ShipPlacement[] }) => void;
   fire: (data: { x: number; y: number }) => void;
   rematch: (data: { gameId: string }) => void;

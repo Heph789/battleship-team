@@ -403,6 +403,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     returnToMenu: () => {
+      getSocket().emit("leave_game");
       set({
         gameId: null,
         gameCode: null,
