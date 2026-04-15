@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "name": "battleship",
+  "scripts": {
+    "dev": "pnpm --filter @battleship/client dev",
+    "build": "pnpm -r build"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
