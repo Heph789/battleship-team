@@ -12,18 +12,12 @@ export default function GameOverView() {
   const yourBoard = useGameStore((s) => s.yourBoard);
   const opponentBoard = useGameStore((s) => s.opponentBoard);
   const gameMode = useGameStore((s) => s.gameMode);
-  const rematch = useGameStore((s) => s.rematch);
   const returnToMenu = useGameStore((s) => s.returnToMenu);
-  const rematchRequested = useGameStore((s) => s.rematchRequested);
 
   const playerWon = winnerId === userId;
 
   const playerGrid = buildCellGrid(yourBoard, true);
   const enemyGrid = buildCellGrid(opponentBoard, true);
-
-  function handleRematch() {
-    rematch();
-  }
 
   function handleMenu() {
     returnToMenu();
@@ -58,20 +52,12 @@ export default function GameOverView() {
         </div>
       </div>
 
-      <div className="flex gap-4">
-        <button
-          onClick={handleRematch}
-          className="rounded-lg bg-blue-600 px-6 py-2 font-semibold transition-colors hover:bg-blue-500"
-        >
-          {rematchRequested ? "Opponent wants rematch — Accept!" : "Rematch"}
-        </button>
-        <button
-          onClick={handleMenu}
-          className="rounded-lg border border-slate-600 px-6 py-2 font-semibold transition-colors hover:bg-slate-800"
-        >
-          Main Menu
-        </button>
-      </div>
+      <button
+        onClick={handleMenu}
+        className="rounded-lg bg-blue-600 px-6 py-2 font-semibold transition-colors hover:bg-blue-500"
+      >
+        Main Menu
+      </button>
     </div>
   );
 }

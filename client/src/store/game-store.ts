@@ -46,7 +46,6 @@ interface GameStore {
   shotMessage: string | null;
   isOpponentThinking: boolean;
   waitingForOpponent: boolean;
-  rematchRequested: boolean;
   errorMessage: string | null;
 
   // Actions: connection
@@ -68,7 +67,6 @@ interface GameStore {
   fireShot: (coord: Coordinate) => void;
 
   // Actions: post-game
-  rematch: () => void;
   returnToMenu: () => void;
 }
 
@@ -84,6 +82,7 @@ function shotResultMessage(result: ShotResult, prefix: string): string {
 
 export const useGameStore = create<GameStore>((set, get) => {
   let initialized = false;
+  let leftGame = false;
 
   // Set up socket listeners once the store is created
   function bindSocketListeners(socket: TypedSocket) {
@@ -216,32 +215,8 @@ export const useGameStore = create<GameStore>((set, get) => {
       });
     });
 
-    socket.on("rematch_requested", () => {
-      set({ rematchRequested: true });
-    });
-
-    socket.on("rematch_created", ({ gameId }) => {
-      set({
-        gameId,
-        gameStatus: "placing_ships",
-        yourBoard: emptyBoard,
-        opponentBoard: emptyBoard,
-        placementShips: [],
-        activeShipType: SHIP_TYPES[0],
-        activeOrientation: "horizontal",
-        hoverCell: null,
-        currentTurn: null,
-        isYourTurn: false,
-        winnerId: null,
-        shotMessage: null,
-        isOpponentThinking: false,
-        waitingForOpponent: false,
-        rematchRequested: false,
-        errorMessage: null,
-      });
-    });
-
     socket.on("reconnect_state", (data) => {
+      if (leftGame) return;
       set({
         gameId: data.gameId,
         gameMode: data.mode,
@@ -282,7 +257,6 @@ export const useGameStore = create<GameStore>((set, get) => {
     shotMessage: null,
     isOpponentThinking: false,
     waitingForOpponent: false,
-    rematchRequested: false,
     errorMessage: null,
 
     initSession: async () => {
@@ -305,6 +279,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     createGame: (mode) => {
+      leftGame = false;
       set({
         gameMode: mode,
         gameStatus: null,
@@ -320,7 +295,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         shotMessage: null,
         isOpponentThinking: false,
         waitingForOpponent: false,
-        rematchRequested: false,
+
         errorMessage: null,
         gameCode: null,
       });
@@ -396,13 +371,8 @@ export const useGameStore = create<GameStore>((set, get) => {
       getSocket().emit("fire", { x: coord.x, y: coord.y });
     },
 
-    rematch: () => {
-      const { gameId } = get();
-      if (!gameId) return;
-      getSocket().emit("rematch", { gameId });
-    },
-
     returnToMenu: () => {
+      leftGame = true;
       getSocket().emit("leave_game");
       set({
         gameId: null,
@@ -420,7 +390,6 @@ export const useGameStore = create<GameStore>((set, get) => {
         shotMessage: null,
         isOpponentThinking: false,
         waitingForOpponent: false,
-        rematchRequested: false,
         errorMessage: null,
       });
     },
