@@ -65,7 +65,7 @@ export type GameState = {
 
 // --- Server types ---
 
-export type GameMode = "ai" | "multiplayer";
+export type GameMode = "ai" | "multiplayer" | "team";
 
 export type GameStatus =
   | "waiting"
@@ -88,6 +88,28 @@ export type ServerGameState = {
   boards: Record<string, PlayerBoard>;
   currentTurn: string; // usedId
   aiState: AIState | null;
+  teamState: TeamGameState | null;
+};
+
+// --- Team mode types ---
+
+export type TeamId = "teamA" | "teamB";
+
+export type ShipPointValues = Record<ShipType, number>;
+
+export type TeamPlayerState = {
+  ready: boolean;
+  pointValues: ShipPointValues;
+  score: number;
+};
+
+export type TeamGameState = {
+  teams: Record<TeamId, { playerIds: string[] }>;
+  boards: Record<TeamId, PlayerBoard>;
+  players: Record<string, TeamPlayerState>;
+  placementShips: Record<TeamId, ShipPlacement[]>;
+  turnOrder: string[];
+  currentTurnIndex: number;
 };
 
 // --- Socket.IO event interfaces ---
@@ -100,6 +122,11 @@ export interface ClientToServerEvents {
   place_ships: (data: { ships: ShipPlacement[] }) => void;
   fire: (data: { x: number; y: number }) => void;
   rematch: (data: { gameId: string }) => void;
+  // Team mode
+  join_team_game: (data: { code: string }) => void;
+  team_place_ship: (data: { ship: ShipPlacement }) => void;
+  team_remove_ship: (data: { shipType: ShipType }) => void;
+  team_lock_in: () => void;
 }
 
 export interface ServerToClientEvents {
@@ -125,4 +152,29 @@ export interface ServerToClientEvents {
     isYourTurn: boolean;
   }) => void;
   error: (data: { message: string }) => void;
+  // Team mode
+  team_lobby_update: (data: {
+    teams: Record<TeamId, { playerIds: string[]; displayNames: string[] }>;
+    playerCount: number;
+  }) => void;
+  teammate_placed_ship: (data: { ship: ShipPlacement }) => void;
+  teammate_removed_ship: (data: { shipType: ShipType }) => void;
+  teammate_locked_in: () => void;
+  team_both_ready: (data: {
+    currentTurn: string;
+    turnOrder: string[];
+    yourPointValues: ShipPointValues;
+  }) => void;
+  team_fire_result: (data: ShotResult & {
+    gameOver: boolean;
+    firerUserId: string;
+    firedAtTeam: TeamId;
+    yourScore?: number;
+  }) => void;
+  team_game_over: (data: {
+    winningTeam: TeamId;
+    scores: Record<string, number>;
+    mvp: string;
+  }) => void;
+  team_turn_update: (data: { currentTurn: string }) => void;
 }

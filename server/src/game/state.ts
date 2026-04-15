@@ -1,5 +1,11 @@
-import type { ServerGameState, ShipPlacement, PlayerBoard } from "@battleship/shared";
-import { initAI } from "@battleship/shared";
+import type {
+  ServerGameState,
+  ShipPlacement,
+  PlayerBoard,
+  TeamGameState,
+  TeamId,
+} from "@battleship/shared";
+import { initAI, generatePointValues } from "@battleship/shared";
 
 export function createInitialState(
   user1Id: string,
@@ -15,6 +21,7 @@ export function createInitialState(
     },
     currentTurn: user1Id,
     aiState: isAI ? initAI() : null,
+    teamState: null,
   };
 
   if (user2Id) {
@@ -63,4 +70,64 @@ export function applyShot(
     return { ...board, misses: [...board.misses, coord] };
   }
   return { ...board, hits: [...board.hits, coord] };
+}
+
+// --- Team mode functions ---
+
+export function createTeamInitialState(
+  teamA: [string, string],
+  teamB: [string, string],
+): TeamGameState {
+  const allPlayers = [...teamA, ...teamB];
+  const players: TeamGameState["players"] = {};
+  for (const id of allPlayers) {
+    players[id] = {
+      ready: false,
+      pointValues: generatePointValues(),
+      score: 0,
+    };
+  }
+
+  return {
+    teams: {
+      teamA: { playerIds: [...teamA] },
+      teamB: { playerIds: [...teamB] },
+    },
+    boards: {
+      teamA: { ships: [], hits: [], misses: [] },
+      teamB: { ships: [], hits: [], misses: [] },
+    },
+    players,
+    placementShips: { teamA: [], teamB: [] },
+    turnOrder: [teamA[0], teamB[0], teamA[1], teamB[1]],
+    currentTurnIndex: 0,
+  };
+}
+
+export function getTeamForPlayer(
+  teamState: TeamGameState,
+  userId: string,
+): TeamId {
+  if (teamState.teams.teamA.playerIds.includes(userId)) return "teamA";
+  return "teamB";
+}
+
+export function getOpponentTeam(teamId: TeamId): TeamId {
+  return teamId === "teamA" ? "teamB" : "teamA";
+}
+
+export function advanceTurn(teamState: TeamGameState): TeamGameState {
+  return {
+    ...teamState,
+    currentTurnIndex:
+      (teamState.currentTurnIndex + 1) % teamState.turnOrder.length,
+  };
+}
+
+export function getCurrentTurnUserId(teamState: TeamGameState): string {
+  return teamState.turnOrder[teamState.currentTurnIndex];
+}
+
+export function allTeamPlayersLockedIn(teamState: TeamGameState): boolean {
+  return Object.values(teamState.players).every((p) => p.ready);
 }

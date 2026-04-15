@@ -12,6 +12,7 @@ import {
   createInitialState,
   setPlayerShips,
 } from "../game/state.js";
+import { createTeamLobby } from "./team-lobby.js";
 
 const AI_USER_ID = "ai";
 
@@ -22,7 +23,28 @@ export function registerLobbyHandlers(io: TypedServer, socket: TypedSocket) {
     const { mode } = data;
     const gameId = crypto.randomUUID();
     const isAI = mode === "ai";
+    const isTeam = mode === "team";
     const code = isAI ? null : generateCode();
+
+    if (isTeam) {
+      // Team mode: create a waiting game and register the team lobby
+      db.insert(schema.game)
+        .values({
+          id: gameId,
+          code,
+          mode,
+          status: "waiting",
+          user1Id: userId,
+          state: {} as Record<string, unknown>,
+        })
+        .run();
+
+      createTeamLobby(gameId, userId);
+      socket.join(gameId);
+      socket.data.gameId = gameId;
+      socket.emit("game_created", { gameId, code });
+      return;
+    }
 
     let state = createInitialState(userId, isAI ? AI_USER_ID : null, isAI);
 

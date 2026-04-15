@@ -10,11 +10,12 @@ export default function Home() {
   const connected = useGameStore((s) => s.connected);
   const createGame = useGameStore((s) => s.createGame);
   const joinGame = useGameStore((s) => s.joinGame);
+  const joinTeamGame = useGameStore((s) => s.joinTeamGame);
   const gameId = useGameStore((s) => s.gameId);
   const errorMessage = useGameStore((s) => s.errorMessage);
 
   const [joinCode, setJoinCode] = useState("");
-  const [showJoin, setShowJoin] = useState(false);
+  const [showJoin, setShowJoin] = useState<false | "multiplayer" | "team">(false);
 
   useEffect(() => {
     initSession();
@@ -35,8 +36,15 @@ export default function Home() {
     createGame("multiplayer");
   }
 
+  function handleCreateTeam() {
+    createGame("team");
+  }
+
   function handleJoin() {
-    if (joinCode.trim().length === 4) {
+    if (joinCode.trim().length !== 4) return;
+    if (showJoin === "team") {
+      joinTeamGame(joinCode.trim());
+    } else {
       joinGame(joinCode.trim());
     }
   }
@@ -70,16 +78,31 @@ export default function Home() {
           onClick={handleCreateMultiplayer}
           className="rounded-lg bg-purple-600 px-8 py-3 text-lg font-semibold transition-colors hover:bg-purple-500"
         >
-          Create Multiplayer Game
+          Create 1v1 Game
+        </button>
+
+        <button
+          onClick={handleCreateTeam}
+          className="rounded-lg bg-amber-600 px-8 py-3 text-lg font-semibold transition-colors hover:bg-amber-500"
+        >
+          Create 2v2 Team Game
         </button>
 
         {!showJoin ? (
-          <button
-            onClick={() => setShowJoin(true)}
-            className="rounded-lg border border-slate-600 px-8 py-3 text-lg font-semibold transition-colors hover:bg-slate-800"
-          >
-            Join Game
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowJoin("multiplayer")}
+              className="flex-1 rounded-lg border border-slate-600 px-4 py-3 text-lg font-semibold transition-colors hover:bg-slate-800"
+            >
+              Join 1v1
+            </button>
+            <button
+              onClick={() => setShowJoin("team")}
+              className="flex-1 rounded-lg border border-amber-600 px-4 py-3 text-lg font-semibold transition-colors hover:bg-slate-800 text-amber-400"
+            >
+              Join 2v2
+            </button>
+          </div>
         ) : (
           <div className="flex gap-2">
             <input

@@ -10,6 +10,7 @@ import {
 import type { TypedServer, TypedSocket } from "./index.js";
 import { db, schema, findGame } from "../db/index.js";
 import { applyShot, getOpponentId } from "../game/state.js";
+import { handleTeamFire } from "./team-firing.js";
 
 const AI_USER_ID = "ai";
 
@@ -27,6 +28,11 @@ export function registerFiringHandlers(io: TypedServer, socket: TypedSocket) {
     const gameRow = findGame(gameId);
     if (!gameRow || gameRow.status !== "in_progress") {
       socket.emit("error", { message: "Game not in progress" });
+      return;
+    }
+
+    if (gameRow.mode === "team") {
+      handleTeamFire(io, socket, gameRow, data);
       return;
     }
 
