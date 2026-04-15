@@ -1,6 +1,6 @@
 {
   "buildCommand": "pnpm --filter @battleship/client build",
-  "outputDirectory": "client/.next",
+  "outputDirectory": ".next",
   "installCommand": "pnpm install --frozen-lockfile",
   "framework": "nextjs"
 }
