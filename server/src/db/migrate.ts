@@ -33,6 +33,10 @@ export function ensureTables() {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS "game_code_unique" ON "game" ("code");
 
+    -- Sentinel row for the AI opponent
+    INSERT OR IGNORE INTO "user" ("id", "display_name", "session_token")
+      VALUES ('ai', 'AI', 'ai-no-login');
+
     CREATE TABLE IF NOT EXISTS "move" (
       "id" text PRIMARY KEY NOT NULL,
       "game_id" text NOT NULL REFERENCES "game"("id"),

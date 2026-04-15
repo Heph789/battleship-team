@@ -12,10 +12,9 @@ let socket: TypedSocket | null = null;
 
 export function getSocket(): TypedSocket {
   if (!socket) {
-    const token = getSessionToken();
     socket = io(SERVER_URL, {
       withCredentials: true,
-      auth: { token },
+      auth: (cb) => cb({ token: getSessionToken() }),
       autoConnect: false,
     });
   }
