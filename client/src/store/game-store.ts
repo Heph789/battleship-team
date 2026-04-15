@@ -8,8 +8,10 @@ import {
   type Orientation,
   type PlayerBoard,
   type ShipPlacement,
+  type ShipPointValues,
   type ShipType,
   type ShotResult,
+  type TeamId,
   validatePlacement,
 } from "@battleship/shared";
 import {
@@ -42,6 +44,19 @@ interface GameStore {
   activeOrientation: Orientation;
   hoverCell: Coordinate | null;
 
+  // Team mode state
+  teamId: TeamId | null;
+  teams: Record<TeamId, { playerIds: string[]; displayNames: string[] }> | null;
+  turnOrder: string[] | null;
+  teamBoard: PlayerBoard;
+  enemyTeamBoard: PlayerBoard;
+  yourScore: number;
+  yourPointValues: ShipPointValues | null;
+  gameOverScores: Record<string, number> | null;
+  mvp: string | null;
+  teammateReady: boolean;
+  teamPlayerCount: number;
+
   // UI state
   shotMessage: string | null;
   isOpponentThinking: boolean;
@@ -63,6 +78,12 @@ interface GameStore {
   placeShip: (coord: Coordinate) => boolean;
   removeShip: (type: ShipType) => void;
   confirmPlacement: () => void;
+
+  // Actions: team placement
+  joinTeamGame: (code: string) => void;
+  teamPlaceShip: (coord: Coordinate) => boolean;
+  teamRemoveShip: (type: ShipType) => void;
+  teamLockIn: () => void;
 
   // Actions: firing
   fireShot: (coord: Coordinate) => void;
@@ -88,11 +109,13 @@ export const useGameStore = create<GameStore>((set, get) => {
   // Set up socket listeners once the store is created
   function bindSocketListeners(socket: TypedSocket) {
     socket.on("game_created", ({ gameId, code }) => {
+      const mode = get().gameMode;
       set({
         gameId,
         gameCode: code,
-        gameStatus: get().gameMode === "ai" ? "placing_ships" : "waiting",
-        waitingForOpponent: get().gameMode === "multiplayer",
+        gameStatus: mode === "ai" ? "placing_ships" : "waiting",
+        waitingForOpponent: mode === "multiplayer" || mode === "team",
+        teamPlayerCount: mode === "team" ? 1 : 0,
       });
     });
 
@@ -260,6 +283,116 @@ export const useGameStore = create<GameStore>((set, get) => {
     socket.on("error", ({ message }) => {
       set({ errorMessage: message });
     });
+
+    // Team mode listeners
+    socket.on("team_lobby_update", ({ teams, playerCount }) => {
+      const { userId } = get();
+      let myTeam: TeamId | null = null;
+      if (userId) {
+        if (teams.teamA.playerIds.includes(userId)) myTeam = "teamA";
+        else if (teams.teamB.playerIds.includes(userId)) myTeam = "teamB";
+      }
+      set({
+        teams,
+        teamId: myTeam,
+        teamPlayerCount: playerCount,
+        waitingForOpponent: playerCount < 4,
+        gameStatus: playerCount < 4 ? "waiting" : "placing_ships",
+      });
+    });
+
+    socket.on("teammate_placed_ship", ({ ship }) => {
+      const { placementShips } = get();
+      const others = placementShips.filter((s) => s.type !== ship.type);
+      set({ placementShips: [...others, ship] });
+    });
+
+    socket.on("teammate_removed_ship", ({ shipType }) => {
+      set((s) => ({
+        placementShips: s.placementShips.filter((ship) => ship.type !== shipType),
+      }));
+    });
+
+    socket.on("teammate_locked_in", () => {
+      set({ teammateReady: true });
+    });
+
+    socket.on("team_both_ready", ({ currentTurn, turnOrder, yourPointValues }) => {
+      const { userId, placementShips } = get();
+      set({
+        gameStatus: "in_progress",
+        currentTurn,
+        turnOrder,
+        isYourTurn: currentTurn === userId,
+        yourPointValues,
+        waitingForOpponent: false,
+        teamBoard: { ships: placementShips, hits: [], misses: [] },
+        enemyTeamBoard: emptyBoard,
+        shotMessage:
+          currentTurn === userId
+            ? "Your turn — fire at the enemy grid!"
+            : "Waiting for other players...",
+      });
+    });
+
+    socket.on("team_fire_result", ({ coordinate, result, shipType, sunkShip, gameOver, firerUserId, firedAtTeam, yourScore }) => {
+      const { teamId, teamBoard, enemyTeamBoard, userId } = get();
+      const isFiredAtMyTeam = firedAtTeam === teamId;
+
+      if (isFiredAtMyTeam) {
+        // Shot landed on our team's board
+        const newBoard = { ...teamBoard };
+        if (result === "miss") {
+          newBoard.misses = [...newBoard.misses, coordinate];
+        } else {
+          newBoard.hits = [...newBoard.hits, coordinate];
+        }
+        set({ teamBoard: newBoard });
+      } else {
+        // Shot landed on enemy team's board
+        const newBoard = { ...enemyTeamBoard };
+        if (result === "miss") {
+          newBoard.misses = [...newBoard.misses, coordinate];
+        } else {
+          newBoard.hits = [...newBoard.hits, coordinate];
+        }
+        if (sunkShip) {
+          newBoard.ships = [...newBoard.ships, sunkShip];
+        }
+        set({ enemyTeamBoard: newBoard });
+      }
+
+      if (yourScore !== undefined) {
+        set({ yourScore });
+      }
+
+      const prefix = firerUserId === userId ? "You" : "Player";
+      const msg = shotResultMessage({ coordinate, result, shipType }, prefix);
+      set({ shotMessage: msg });
+    });
+
+    socket.on("team_game_over", ({ winningTeam, scores, mvp }) => {
+      set({
+        gameStatus: "completed",
+        gameOverScores: scores,
+        mvp,
+        winnerId: winningTeam,
+        isOpponentThinking: false,
+      });
+    });
+
+    socket.on("team_turn_update", ({ currentTurn }) => {
+      const { userId } = get();
+      set({
+        currentTurn,
+        isYourTurn: currentTurn === userId,
+        isOpponentThinking: currentTurn !== userId,
+        shotMessage:
+          currentTurn === userId
+            ? "Your turn — fire at the enemy grid!"
+            : "Waiting for other players...",
+      });
+    });
   }
 
   return {
@@ -279,6 +412,17 @@ export const useGameStore = create<GameStore>((set, get) => {
     activeShipType: SHIP_TYPES[0],
     activeOrientation: "horizontal",
     hoverCell: null,
+    teamId: null,
+    teams: null,
+    turnOrder: null,
+    teamBoard: emptyBoard,
+    enemyTeamBoard: emptyBoard,
+    yourScore: 0,
+    yourPointValues: null,
+    gameOverScores: null,
+    mvp: null,
+    teammateReady: false,
+    teamPlayerCount: 0,
     shotMessage: null,
     isOpponentThinking: false,
     waitingForOpponent: false,
@@ -387,6 +531,67 @@ export const useGameStore = create<GameStore>((set, get) => {
       const { placementShips } = get();
       if (placementShips.length !== SHIP_TYPES.length) return;
       getSocket().emit("place_ships", { ships: placementShips });
+    },
+
+    joinTeamGame: (code) => {
+      set({
+        gameMode: "team",
+        gameStatus: null,
+        yourBoard: emptyBoard,
+        opponentBoard: emptyBoard,
+        teamBoard: emptyBoard,
+        enemyTeamBoard: emptyBoard,
+        placementShips: [],
+        activeShipType: SHIP_TYPES[0],
+        activeOrientation: "horizontal",
+        errorMessage: null,
+        yourScore: 0,
+        yourPointValues: null,
+        gameOverScores: null,
+        mvp: null,
+        teammateReady: false,
+      });
+      getSocket().emit("join_team_game", { code: code.toUpperCase() });
+    },
+
+    teamPlaceShip: (coord) => {
+      const { activeShipType, activeOrientation, placementShips } = get();
+      if (!activeShipType) return false;
+
+      const ship: ShipPlacement = {
+        type: activeShipType,
+        startX: coord.x,
+        startY: coord.y,
+        orientation: activeOrientation,
+      };
+
+      const others = placementShips.filter((s) => s.type !== activeShipType);
+      if (!validatePlacement(ship, others)) return false;
+
+      const newPlacements = [...others, ship];
+      const placedTypes = new Set(newPlacements.map((s) => s.type));
+      const nextShip = SHIP_TYPES.find((t) => !placedTypes.has(t)) ?? null;
+
+      set({
+        placementShips: newPlacements,
+        activeShipType: nextShip,
+      });
+
+      // Emit to server for teammate sync
+      getSocket().emit("team_place_ship", { ship });
+      return true;
+    },
+
+    teamRemoveShip: (type) => {
+      set((s) => ({
+        placementShips: s.placementShips.filter((ship) => ship.type !== type),
+        activeShipType: type,
+      }));
+      getSocket().emit("team_remove_ship", { shipType: type });
+    },
+
+    teamLockIn: () => {
+      getSocket().emit("team_lock_in");
     },
 
     fireShot: (coord) => {

@@ -12,7 +12,7 @@ export const user = sqliteTable("user", {
 export const game = sqliteTable("game", {
   id: text("id").primaryKey(),
   code: text("code").unique(),
-  mode: text("mode", { enum: ["ai", "multiplayer"] }).notNull(),
+  mode: text("mode", { enum: ["ai", "multiplayer", "team"] }).notNull(),
   status: text("status", {
     enum: ["waiting", "placing_ships", "in_progress", "completed", "abandoned"],
   }).notNull(),
@@ -20,6 +20,8 @@ export const game = sqliteTable("game", {
     .notNull()
     .references(() => user.id),
   user2Id: text("user2_id").references(() => user.id),
+  user3Id: text("user3_id").references(() => user.id),
+  user4Id: text("user4_id").references(() => user.id),
   winnerId: text("winner_id").references(() => user.id),
   state: text("state", { mode: "json" }).$type<Record<string, unknown>>(),
   createdAt: integer("created_at", { mode: "timestamp" })
