@@ -5,10 +5,8 @@ import { useGameStore } from "@/store/game-store";
 import Board from "@/components/board/Board";
 
 export default function PlayerFleetBoard() {
-  const game = useGameStore((s) => s.game);
-  if (!game) return null;
-
-  const grid = buildCellGrid(game.playerBoard, true);
+  const yourBoard = useGameStore((s) => s.yourBoard);
+  const grid = buildCellGrid(yourBoard, true);
 
   return (
     <div className="flex flex-col items-center gap-2">

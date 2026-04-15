@@ -1,34 +1,106 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useGameStore } from "@/store/game-store";
 
 export default function Home() {
   const router = useRouter();
-  const startNewGame = useGameStore((s) => s.startNewGame);
+  const initSession = useGameStore((s) => s.initSession);
+  const connected = useGameStore((s) => s.connected);
+  const createGame = useGameStore((s) => s.createGame);
+  const joinGame = useGameStore((s) => s.joinGame);
+  const gameId = useGameStore((s) => s.gameId);
+  const errorMessage = useGameStore((s) => s.errorMessage);
+
+  const [joinCode, setJoinCode] = useState("");
+  const [showJoin, setShowJoin] = useState(false);
+
+  useEffect(() => {
+    initSession();
+  }, [initSession]);
+
+  // Navigate when a game is created/joined
+  useEffect(() => {
+    if (gameId) {
+      router.push(`/game/${gameId}`);
+    }
+  }, [gameId, router]);
 
   function handlePlayAI() {
-    const id = startNewGame();
-    router.push(`/game/${id}`);
+    createGame("ai");
+  }
+
+  function handleCreateMultiplayer() {
+    createGame("multiplayer");
+  }
+
+  function handleJoin() {
+    if (joinCode.trim().length === 4) {
+      joinGame(joinCode.trim());
+    }
+  }
+
+  if (!connected) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4">
+        <p className="text-slate-400 animate-pulse">Connecting...</p>
+      </div>
+    );
   }
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-8">
       <h1 className="text-6xl font-bold tracking-tight">Battleship</h1>
       <p className="text-lg text-slate-400">A classic game of naval strategy</p>
-      <div className="flex flex-col gap-3">
+
+      {errorMessage && (
+        <p className="text-red-400 text-sm">{errorMessage}</p>
+      )}
+
+      <div className="flex flex-col gap-3 w-64">
         <button
           onClick={handlePlayAI}
           className="rounded-lg bg-blue-600 px-8 py-3 text-lg font-semibold transition-colors hover:bg-blue-500"
         >
           Play vs AI
         </button>
+
         <button
-          disabled
-          className="rounded-lg border border-slate-600 px-8 py-3 text-lg font-semibold text-slate-500 cursor-not-allowed"
+          onClick={handleCreateMultiplayer}
+          className="rounded-lg bg-purple-600 px-8 py-3 text-lg font-semibold transition-colors hover:bg-purple-500"
         >
-          Multiplayer (coming soon)
+          Create Multiplayer Game
         </button>
+
+        {!showJoin ? (
+          <button
+            onClick={() => setShowJoin(true)}
+            className="rounded-lg border border-slate-600 px-8 py-3 text-lg font-semibold transition-colors hover:bg-slate-800"
+          >
+            Join Game
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 4))}
+              onKeyDown={(e) => e.key === "Enter" && handleJoin()}
+              placeholder="CODE"
+              className="flex-1 rounded-lg bg-slate-800 border border-slate-600 px-4 py-3 text-center text-lg font-mono tracking-widest uppercase focus:outline-none focus:border-blue-500"
+              maxLength={4}
+              autoFocus
+            />
+            <button
+              onClick={handleJoin}
+              disabled={joinCode.trim().length !== 4}
+              className="rounded-lg bg-green-600 px-4 py-3 font-semibold transition-colors hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Go
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

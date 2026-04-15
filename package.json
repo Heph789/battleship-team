@@ -2,8 +2,13 @@
   "private": true,
   "name": "battleship",
   "scripts": {
-    "dev": "pnpm --filter @battleship/client dev",
+    "dev": "pnpm --filter @battleship/server dev & pnpm --filter @battleship/client dev",
+    "dev:server": "pnpm --filter @battleship/server dev",
+    "dev:client": "pnpm --filter @battleship/client dev",
     "build": "pnpm -r build"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3", "esbuild"]
   },
   "devDependencies": {
     "typescript": "^5.7.0"

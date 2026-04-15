@@ -5,13 +5,13 @@ import { useGameStore } from "@/store/game-store";
 import Board from "@/components/board/Board";
 
 export default function OpponentTargetBoard() {
-  const game = useGameStore((s) => s.game);
+  const opponentBoard = useGameStore((s) => s.opponentBoard);
   const fireShot = useGameStore((s) => s.fireShot);
-  const isAiThinking = useGameStore((s) => s.isAiThinking);
-  if (!game) return null;
+  const isYourTurn = useGameStore((s) => s.isYourTurn);
+  const isOpponentThinking = useGameStore((s) => s.isOpponentThinking);
 
-  // Don't show AI's ships — only hits/misses
-  const grid = buildCellGrid(game.aiBoard, false);
+  // Don't show opponent's ships — only hits/misses
+  const grid = buildCellGrid(opponentBoard, false);
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -20,7 +20,7 @@ export default function OpponentTargetBoard() {
       </h3>
       <Board
         grid={grid}
-        interactive={!isAiThinking && game.currentTurn === "player"}
+        interactive={!isOpponentThinking && isYourTurn}
         onCellClick={(coord) => fireShot(coord)}
       />
     </div>

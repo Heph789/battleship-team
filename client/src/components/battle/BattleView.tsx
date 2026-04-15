@@ -6,14 +6,14 @@ import OpponentTargetBoard from "./OpponentTargetBoard";
 
 export default function BattleView() {
   const shotMessage = useGameStore((s) => s.shotMessage);
-  const isAiThinking = useGameStore((s) => s.isAiThinking);
+  const isOpponentThinking = useGameStore((s) => s.isOpponentThinking);
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6">
       <div className="h-8 text-center">
-        {isAiThinking ? (
+        {isOpponentThinking ? (
           <p className="text-yellow-400 font-medium animate-pulse">
-            AI is thinking...
+            Opponent is thinking...
           </p>
         ) : (
           shotMessage && (

@@ -114,7 +114,7 @@ export function checkShot(
   // It's a hit — check if this sinks the ship (including this new hit)
   const allHits = [...targetBoard.hits, coord];
   if (isShipSunk(ship, allHits)) {
-    return { coordinate: coord, result: "sunk", shipType: ship.type };
+    return { coordinate: coord, result: "sunk", shipType: ship.type, sunkShip: ship };
   }
   return { coordinate: coord, result: "hit" };
 }

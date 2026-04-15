@@ -7,27 +7,30 @@ import Board from "@/components/board/Board";
 
 export default function GameOverView() {
   const router = useRouter();
-  const game = useGameStore((s) => s.game);
+  const userId = useGameStore((s) => s.userId);
+  const winnerId = useGameStore((s) => s.winnerId);
+  const yourBoard = useGameStore((s) => s.yourBoard);
+  const opponentBoard = useGameStore((s) => s.opponentBoard);
+  const gameMode = useGameStore((s) => s.gameMode);
   const rematch = useGameStore((s) => s.rematch);
   const returnToMenu = useGameStore((s) => s.returnToMenu);
+  const rematchRequested = useGameStore((s) => s.rematchRequested);
 
-  if (!game) return null;
+  const playerWon = winnerId === userId;
 
-  const playerWon = game.winner === "player";
-
-  // Reveal all ships on both boards
-  const playerGrid = buildCellGrid(game.playerBoard, true);
-  const aiGrid = buildCellGrid(game.aiBoard, true);
+  const playerGrid = buildCellGrid(yourBoard, true);
+  const enemyGrid = buildCellGrid(opponentBoard, true);
 
   function handleRematch() {
-    const id = rematch();
-    router.push(`/game/${id}`);
+    rematch();
   }
 
   function handleMenu() {
     returnToMenu();
     router.push("/");
   }
+
+  const loserLabel = gameMode === "ai" ? "The AI sunk all your ships!" : "Your opponent sunk all your ships!";
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6">
@@ -37,9 +40,7 @@ export default function GameOverView() {
         {playerWon ? "Victory!" : "Defeat!"}
       </h2>
       <p className="text-slate-400">
-        {playerWon
-          ? "You sunk all enemy ships!"
-          : "The AI sunk all your ships!"}
+        {playerWon ? "You sunk all enemy ships!" : loserLabel}
       </p>
 
       <div className="flex gap-12 items-start">
@@ -53,7 +54,7 @@ export default function GameOverView() {
           <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide">
             Enemy Fleet
           </h3>
-          <Board grid={aiGrid} />
+          <Board grid={enemyGrid} />
         </div>
       </div>
 
@@ -62,7 +63,7 @@ export default function GameOverView() {
           onClick={handleRematch}
           className="rounded-lg bg-blue-600 px-6 py-2 font-semibold transition-colors hover:bg-blue-500"
         >
-          Rematch
+          {rematchRequested ? "Opponent wants rematch — Accept!" : "Rematch"}
         </button>
         <button
           onClick={handleMenu}
