@@ -1,8 +1,8 @@
 import Database from "better-sqlite3";
-import { readFileSync, existsSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 
-const DB_PATH = "./data/battleship.db";
+const DB_PATH = process.env.DB_PATH ?? "./data/battleship.db";
 
 export function ensureTables() {
   mkdirSync(dirname(DB_PATH), { recursive: true });
