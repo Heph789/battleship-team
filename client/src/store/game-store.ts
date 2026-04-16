@@ -91,7 +91,15 @@ interface GameStore {
   teamFire: (coord: Coordinate) => void;
   teamShareDecision: (share: boolean) => void;
 
+  // Rematch state
+  rematchState: "idle" | "requested" | "opponent_requested";
+  rematchAcceptedCount: number;
+  rematchRequiredCount: number;
+  rematchGameId: string | null;
+
   // Actions: post-game
+  requestRematch: () => void;
+  startRematch: () => void;
   returnToMenu: () => void;
 }
 
@@ -502,6 +510,26 @@ export const useGameStore = create<GameStore>((set, get) => {
         waitingForTeammate: false,
       });
     });
+
+    socket.on("rematch_requested", (data) => {
+      const acceptedCount = data?.acceptedCount ?? 1;
+      const requiredCount = data?.requiredCount ?? 2;
+      const { rematchState } = get();
+      if (rematchState === "requested") {
+        // We already requested — just update the count
+        set({ rematchAcceptedCount: acceptedCount });
+      } else {
+        set({
+          rematchState: "opponent_requested",
+          rematchAcceptedCount: acceptedCount,
+          rematchRequiredCount: requiredCount,
+        });
+      }
+    });
+
+    socket.on("rematch_created", ({ gameId }) => {
+      set({ rematchGameId: gameId });
+    });
   }
 
   return {
@@ -534,6 +562,10 @@ export const useGameStore = create<GameStore>((set, get) => {
     mvp: null,
     teammateReady: false,
     teamPlayerCount: 0,
+    rematchState: "idle",
+    rematchAcceptedCount: 0,
+    rematchRequiredCount: 0,
+    rematchGameId: null,
     shotMessage: null,
     isOpponentThinking: false,
     waitingForOpponent: false,
@@ -727,6 +759,54 @@ export const useGameStore = create<GameStore>((set, get) => {
       getSocket().emit("team_share_decision", { share });
     },
 
+    requestRematch: () => {
+      const { gameId } = get();
+      if (!gameId) return;
+      set({ rematchState: "requested" });
+      getSocket().emit("rematch", { gameId });
+    },
+
+    startRematch: () => {
+      const { rematchGameId, gameMode } = get();
+      if (!rematchGameId) return;
+      leftGame = false;
+      set({
+        gameId: rematchGameId,
+        gameCode: null,
+        gameStatus: "placing_ships",
+        yourBoard: emptyBoard,
+        opponentBoard: emptyBoard,
+        placementShips: [],
+        activeShipType: SHIP_TYPES[0],
+        activeOrientation: "horizontal",
+        hoverCell: null,
+        currentTurn: null,
+        isYourTurn: false,
+        winnerId: null,
+        shotMessage: null,
+        isOpponentThinking: false,
+        waitingForOpponent: false,
+        errorMessage: null,
+        rematchState: "idle",
+        rematchAcceptedCount: 0,
+        rematchRequiredCount: 0,
+        rematchGameId: null,
+        // Reset team state for team rematches
+        teamBoard: emptyBoard,
+        myEnemyView: emptyBoard,
+        hitCount: 0,
+        currentTeamTurn: null,
+        sharePromptResult: null,
+        waitingForTeammate: false,
+        wastedCells: [],
+        gameOverHitCounts: null,
+        mvp: null,
+        teammateReady: false,
+      });
+      // Trigger reconnect to hydrate state from server
+      getSocket().emit("reconnect_game", { gameId: rematchGameId });
+    },
+
     returnToMenu: () => {
       leftGame = true;
       getSocket().emit("leave_game");
@@ -747,6 +827,10 @@ export const useGameStore = create<GameStore>((set, get) => {
         isOpponentThinking: false,
         waitingForOpponent: false,
         errorMessage: null,
+        rematchState: "idle",
+        rematchAcceptedCount: 0,
+        rematchRequiredCount: 0,
+        rematchGameId: null,
       });
     },
   };

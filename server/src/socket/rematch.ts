@@ -7,7 +7,7 @@ import {
 import type { TypedServer, TypedSocket } from "./index.js";
 import { db, schema, findGame } from "../db/index.js";
 import { generateCode } from "../game/code.js";
-import { createInitialState, setPlayerShips } from "../game/state.js";
+import { createInitialState, setPlayerShips, createTeamInitialState } from "../game/state.js";
 
 const AI_USER_ID = "ai";
 
@@ -52,6 +52,66 @@ export function registerRematchHandlers(io: TypedServer, socket: TypedSocket) {
       return;
     }
 
+    // Team mode: wait for all 4 players to request
+    if (gameRow.mode === "team") {
+      if (!rematchRequests.has(data.gameId)) {
+        rematchRequests.set(data.gameId, new Set());
+      }
+      const requests = rematchRequests.get(data.gameId)!;
+      requests.add(userId);
+
+      if (requests.size < 4) {
+        io.to(data.gameId).emit("rematch_requested", {
+          acceptedCount: requests.size,
+          requiredCount: 4,
+        });
+        return;
+      }
+
+      // All 4 requested — create new team game
+      rematchRequests.delete(data.gameId);
+      const newGameId = crypto.randomUUID();
+      const teamA: [string, string] = [gameRow.user1Id, gameRow.user2Id!];
+      const teamB: [string, string] = [gameRow.user3Id!, gameRow.user4Id!];
+      const teamState = createTeamInitialState(teamA, teamB);
+
+      const state: ServerGameState = {
+        players: {},
+        boards: {},
+        currentTurn: "",
+        aiState: null,
+        teamState,
+      };
+
+      db.insert(schema.game)
+        .values({
+          id: newGameId,
+          code: null,
+          mode: "team",
+          status: "placing_ships",
+          user1Id: teamA[0],
+          user2Id: teamA[1],
+          user3Id: teamB[0],
+          user4Id: teamB[1],
+          state: state as unknown as Record<string, unknown>,
+        })
+        .run();
+
+      io.to(data.gameId).emit("rematch_created", { gameId: newGameId });
+      const sockets = io.sockets.adapter.rooms.get(data.gameId);
+      if (sockets) {
+        for (const sid of sockets) {
+          const s = io.sockets.sockets.get(sid);
+          if (s) {
+            s.leave(data.gameId);
+            s.join(newGameId);
+            (s as unknown as TypedSocket).data.gameId = newGameId;
+          }
+        }
+      }
+      return;
+    }
+
     // Multiplayer: wait for both players to request
     if (!rematchRequests.has(data.gameId)) {
       rematchRequests.set(data.gameId, new Set());
@@ -60,7 +120,10 @@ export function registerRematchHandlers(io: TypedServer, socket: TypedSocket) {
     requests.add(userId);
 
     if (requests.size < 2) {
-      socket.to(data.gameId).emit("rematch_requested");
+      io.to(data.gameId).emit("rematch_requested", {
+        acceptedCount: 1,
+        requiredCount: 2,
+      });
       return;
     }
 

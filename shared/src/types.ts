@@ -151,7 +151,7 @@ export interface ServerToClientEvents {
   fire_result: (data: ShotResult & { gameOver: boolean }) => void;
   opponent_fired: (data: ShotResult & { gameOver: boolean }) => void;
   game_over: (data: { winnerId: string }) => void;
-  rematch_requested: () => void;
+  rematch_requested: (data: { acceptedCount: number; requiredCount: number }) => void;
   rematch_created: (data: { gameId: string }) => void;
   reconnect_state: (data: {
     gameId: string;

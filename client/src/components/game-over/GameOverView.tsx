@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { buildCellGrid } from "@battleship/shared";
 import { useGameStore } from "@/store/game-store";
@@ -13,11 +14,23 @@ export default function GameOverView() {
   const opponentBoard = useGameStore((s) => s.opponentBoard);
   const gameMode = useGameStore((s) => s.gameMode);
   const returnToMenu = useGameStore((s) => s.returnToMenu);
+  const requestRematch = useGameStore((s) => s.requestRematch);
+  const startRematch = useGameStore((s) => s.startRematch);
+  const rematchState = useGameStore((s) => s.rematchState);
+  const rematchGameId = useGameStore((s) => s.rematchGameId);
 
   const playerWon = winnerId === userId;
 
   const playerGrid = buildCellGrid(yourBoard, true);
   const enemyGrid = buildCellGrid(opponentBoard, true);
+
+  useEffect(() => {
+    if (rematchGameId) {
+      const newId = rematchGameId;
+      startRematch();
+      router.push(`/game/${newId}`);
+    }
+  }, [rematchGameId, startRematch, router]);
 
   function handleMenu() {
     returnToMenu();
@@ -52,12 +65,51 @@ export default function GameOverView() {
         </div>
       </div>
 
-      <button
-        onClick={handleMenu}
-        className="rounded-lg bg-blue-600 px-6 py-2 font-semibold transition-colors hover:bg-blue-500"
-      >
-        Main Menu
-      </button>
+      <div className="flex gap-4">
+        {gameMode === "ai" && (
+          <button
+            onClick={requestRematch}
+            disabled={rematchState === "requested"}
+            className="rounded-lg bg-green-600 px-6 py-2 font-semibold transition-colors hover:bg-green-500 disabled:opacity-50"
+          >
+            Play Again
+          </button>
+        )}
+
+        {gameMode === "multiplayer" && rematchState === "idle" && (
+          <button
+            onClick={requestRematch}
+            className="rounded-lg bg-green-600 px-6 py-2 font-semibold transition-colors hover:bg-green-500"
+          >
+            Rematch
+          </button>
+        )}
+
+        {gameMode === "multiplayer" && rematchState === "requested" && (
+          <button
+            disabled
+            className="rounded-lg bg-green-600 px-6 py-2 font-semibold opacity-50"
+          >
+            Waiting for opponent...
+          </button>
+        )}
+
+        {gameMode === "multiplayer" && rematchState === "opponent_requested" && (
+          <button
+            onClick={requestRematch}
+            className="rounded-lg bg-green-600 px-6 py-2 font-semibold transition-colors hover:bg-green-500 animate-pulse"
+          >
+            Opponent wants rematch!
+          </button>
+        )}
+
+        <button
+          onClick={handleMenu}
+          className="rounded-lg border border-slate-600 px-6 py-2 font-semibold transition-colors hover:bg-slate-800"
+        >
+          Main Menu
+        </button>
+      </div>
     </div>
   );
 }

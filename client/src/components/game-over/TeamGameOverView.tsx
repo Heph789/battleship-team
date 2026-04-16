@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { buildCellGrid } from "@battleship/shared";
 import { useGameStore } from "@/store/game-store";
@@ -16,11 +17,25 @@ export default function TeamGameOverView() {
   const mvp = useGameStore((s) => s.mvp);
   const teams = useGameStore((s) => s.teams);
   const returnToMenu = useGameStore((s) => s.returnToMenu);
+  const requestRematch = useGameStore((s) => s.requestRematch);
+  const startRematch = useGameStore((s) => s.startRematch);
+  const rematchState = useGameStore((s) => s.rematchState);
+  const rematchAcceptedCount = useGameStore((s) => s.rematchAcceptedCount);
+  const rematchRequiredCount = useGameStore((s) => s.rematchRequiredCount);
+  const rematchGameId = useGameStore((s) => s.rematchGameId);
 
   const teamWon = winnerId === teamId;
 
   const teamGrid = buildCellGrid(teamBoard, true);
   const enemyGrid = buildCellGrid(myEnemyView, true);
+
+  useEffect(() => {
+    if (rematchGameId) {
+      const newId = rematchGameId;
+      startRematch();
+      router.push(`/game/${newId}`);
+    }
+  }, [rematchGameId, startRematch, router]);
 
   function handleMenu() {
     returnToMenu();
@@ -94,12 +109,41 @@ export default function TeamGameOverView() {
         </div>
       </div>
 
-      <button
-        onClick={handleMenu}
-        className="rounded-lg border border-slate-600 px-6 py-2 font-semibold transition-colors hover:bg-slate-800"
-      >
-        Main Menu
-      </button>
+      <div className="flex gap-4">
+        {rematchState === "idle" && (
+          <button
+            onClick={requestRematch}
+            className="rounded-lg bg-green-600 px-6 py-2 font-semibold transition-colors hover:bg-green-500"
+          >
+            Rematch
+          </button>
+        )}
+
+        {rematchState === "requested" && (
+          <button
+            disabled
+            className="rounded-lg bg-green-600 px-6 py-2 font-semibold opacity-50"
+          >
+            Waiting... ({rematchAcceptedCount}/{rematchRequiredCount})
+          </button>
+        )}
+
+        {rematchState === "opponent_requested" && (
+          <button
+            onClick={requestRematch}
+            className="rounded-lg bg-green-600 px-6 py-2 font-semibold transition-colors hover:bg-green-500 animate-pulse"
+          >
+            {rematchAcceptedCount}/{rematchRequiredCount} want rematch - join!
+          </button>
+        )}
+
+        <button
+          onClick={handleMenu}
+          className="rounded-lg border border-slate-600 px-6 py-2 font-semibold transition-colors hover:bg-slate-800"
+        >
+          Main Menu
+        </button>
+      </div>
     </div>
   );
 }
