@@ -82,6 +82,29 @@ export function registerTeamFiringHandlers(
         anyHits = true;
       }
 
+      // Update player's private view with their own shot
+      const playerView = teamState.playerViews[pid];
+      if (shotResult.result === "miss") {
+        playerView.misses = [...playerView.misses, coord];
+      } else if (shotResult.result === "hit" || shotResult.result === "sunk") {
+        playerView.hits = [...playerView.hits, coord];
+        if (shotResult.sunkShip) {
+          playerView.ships = [...playerView.ships, shotResult.sunkShip];
+        }
+      } else if (shotResult.result === "wasted") {
+        // Mark in hits if not already there
+        const alreadyInHits = playerView.hits.some((c) => c.x === coord.x && c.y === coord.y);
+        if (!alreadyInHits) {
+          playerView.hits = [...playerView.hits, coord];
+        }
+        if (shotResult.revealedSunkShip) {
+          const alreadyHasShip = playerView.ships.some((s) => s.type === shotResult.revealedSunkShip!.type);
+          if (!alreadyHasShip) {
+            playerView.ships = [...playerView.ships, shotResult.revealedSunkShip];
+          }
+        }
+      }
+
       // Record move
       db.insert(schema.move)
         .values({

@@ -11,8 +11,10 @@ import { generateCode } from "../game/code.js";
 import {
   createInitialState,
   setPlayerShips,
+  getTeamForPlayer,
+  getOpponentTeam,
 } from "../game/state.js";
-import { createTeamLobby } from "./team-lobby.js";
+import { createTeamLobby, getTeamLobby } from "./team-lobby.js";
 
 const AI_USER_ID = "ai";
 
@@ -128,7 +130,9 @@ export function registerLobbyHandlers(io: TypedServer, socket: TypedSocket) {
       socket.emit("error", { message: "Game not found" });
       return;
     }
-    if (gameRow.user1Id !== userId && gameRow.user2Id !== userId) {
+
+    const playerIds = [gameRow.user1Id, gameRow.user2Id, gameRow.user3Id, gameRow.user4Id];
+    if (!playerIds.includes(userId)) {
       socket.emit("error", { message: "Not a participant" });
       return;
     }
@@ -137,6 +141,67 @@ export function registerLobbyHandlers(io: TypedServer, socket: TypedSocket) {
     socket.data.gameId = data.gameId;
 
     const state = gameRow.state as unknown as ServerGameState;
+
+    // Team mode reconnect
+    if (gameRow.mode === "team") {
+      // Lobby phase — re-emit lobby state from in-memory lobby
+      if (gameRow.status === "waiting") {
+        const lobbyUpdate = getTeamLobby(data.gameId);
+        if (lobbyUpdate) {
+          socket.emit("game_created", { gameId: data.gameId, code: gameRow.code });
+          socket.emit("team_lobby_update", lobbyUpdate);
+        }
+        return;
+      }
+
+      const teamState = state.teamState!;
+      const teamId = getTeamForPlayer(teamState, userId);
+      const enemyTeam = getOpponentTeam(teamId);
+      const teammateId = teamState.teams[teamId].playerIds.find((id) => id !== userId);
+
+      const lookupDisplayName = (id: string) => {
+        const user = db.select().from(schema.user).where(eq(schema.user.id, id)).get();
+        return user?.displayName ?? "Unknown";
+      };
+
+      const teams = {
+        teamA: {
+          playerIds: teamState.teams.teamA.playerIds,
+          displayNames: teamState.teams.teamA.playerIds.map(lookupDisplayName),
+        },
+        teamB: {
+          playerIds: teamState.teams.teamB.playerIds,
+          displayNames: teamState.teams.teamB.playerIds.map(lookupDisplayName),
+        },
+      };
+
+      const isMyTeamsTurn = teamState.currentTeamTurn === teamId;
+      const hasFired = teamState.pendingShots[userId] != null;
+
+      socket.emit("reconnect_state", {
+        gameId: data.gameId,
+        mode: "team",
+        status: gameRow.status as any,
+        yourShips: [],
+        yourBoard: { ships: [], hits: [], misses: [] },
+        opponentBoard: { ships: [], hits: [], misses: [] },
+        currentTurn: "",
+        winnerId: gameRow.winnerId,
+        isYourTurn: isMyTeamsTurn,
+        teamId,
+        teams,
+        teamBoard: teamState.boards[teamId],
+        myEnemyView: teamState.playerViews[userId],
+        hitCount: teamState.players[userId].hitCount,
+        currentTeamTurn: teamState.currentTeamTurn,
+        turnPhase: teamState.turnPhase,
+        teammateReady: teammateId ? teamState.players[teammateId].ready : false,
+        placementShips: teamState.placementShips[teamId],
+      });
+      return;
+    }
+
+    // 1v1 / AI reconnect
     const opponentId =
       gameRow.user1Id === userId ? gameRow.user2Id! : gameRow.user1Id;
 

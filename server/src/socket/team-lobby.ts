@@ -132,3 +132,9 @@ export function registerTeamLobbyHandlers(
 export function createTeamLobby(gameId: string, creatorId: string) {
   teamLobbies.set(gameId, { teamA: [creatorId], teamB: [] });
 }
+
+export function getTeamLobby(gameId: string) {
+  const lobby = teamLobbies.get(gameId);
+  if (!lobby) return null;
+  return buildLobbyUpdate(lobby);
+}

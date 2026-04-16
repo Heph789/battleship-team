@@ -244,6 +244,55 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     socket.on("reconnect_state", (data) => {
       if (leftGame) return;
+
+      if (data.teamId) {
+        const isMyTeamsTurn = data.currentTeamTurn === data.teamId;
+        const isFiring = data.turnPhase === "firing";
+        const isSharing = data.turnPhase === "sharing";
+
+        let shotMessage = "Waiting...";
+        let waitingForTeammate = false;
+        if (data.status === "placing_ships") {
+          shotMessage = "Place your ships!";
+        } else if (data.status === "in_progress") {
+          if (isMyTeamsTurn) {
+            if (isSharing) {
+              shotMessage = "Decide whether to share your result.";
+            } else {
+              shotMessage = "Your team's turn — fire!";
+            }
+          } else {
+            shotMessage = "Enemy team's turn...";
+          }
+        } else if (data.status === "completed") {
+          shotMessage = data.winnerId === data.teamId
+            ? "Your team wins!"
+            : "Your team lost.";
+        }
+
+        set({
+          gameId: data.gameId,
+          gameMode: "team",
+          gameStatus: data.status,
+          teamId: data.teamId,
+          teams: data.teams ?? null,
+          teamBoard: data.teamBoard ?? emptyBoard,
+          myEnemyView: data.myEnemyView ?? emptyBoard,
+          hitCount: data.hitCount ?? 0,
+          currentTeamTurn: data.currentTeamTurn ?? null,
+          isYourTurn: isMyTeamsTurn,
+          winnerId: data.winnerId,
+          placementShips: data.placementShips ?? [],
+          teammateReady: data.teammateReady ?? false,
+          waitingForTeammate,
+          sharePromptResult: null,
+          wastedCells: [],
+          shotMessage,
+          isOpponentThinking: !isMyTeamsTurn && data.status === "in_progress",
+        });
+        return;
+      }
+
       set({
         gameId: data.gameId,
         gameMode: data.mode,

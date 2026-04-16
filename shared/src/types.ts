@@ -163,6 +163,16 @@ export interface ServerToClientEvents {
     currentTurn: string;
     winnerId: string | null;
     isYourTurn: boolean;
+    // Team mode fields (present when mode === "team")
+    teamId?: TeamId;
+    teams?: Record<TeamId, { playerIds: string[]; displayNames: string[] }>;
+    teamBoard?: PlayerBoard;
+    myEnemyView?: PlayerBoard;
+    hitCount?: number;
+    currentTeamTurn?: TeamId;
+    turnPhase?: TeamTurnPhase;
+    teammateReady?: boolean;
+    placementShips?: ShipPlacement[];
   }) => void;
   error: (data: { message: string }) => void;
   // Team mode
