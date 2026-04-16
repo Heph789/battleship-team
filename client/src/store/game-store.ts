@@ -615,6 +615,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     joinGame: (code) => {
+      leftGame = false;
       set({
         gameMode: "multiplayer",
         gameStatus: null,
@@ -677,6 +678,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     joinTeamGame: (code) => {
+      leftGame = false;
       set({
         gameMode: "team",
         gameStatus: null,

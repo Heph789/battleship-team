@@ -146,7 +146,7 @@ export function registerLobbyHandlers(io: TypedServer, socket: TypedSocket) {
     if (gameRow.mode === "team") {
       // Lobby phase — re-emit lobby state from in-memory lobby
       if (gameRow.status === "waiting") {
-        const lobbyUpdate = getTeamLobby(data.gameId);
+        const lobbyUpdate = getTeamLobby(data.gameId, gameRow);
         if (lobbyUpdate) {
           socket.emit("game_created", { gameId: data.gameId, code: gameRow.code });
           socket.emit("team_lobby_update", lobbyUpdate);

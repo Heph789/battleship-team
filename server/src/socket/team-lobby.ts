@@ -61,10 +61,16 @@ export function registerTeamLobbyHandlers(
       return;
     }
 
-    const lobby = teamLobbies.get(gameRow.id);
+    let lobby = teamLobbies.get(gameRow.id);
     if (!lobby) {
-      socket.emit("error", { message: "Lobby not found" });
-      return;
+      // Lobby lost (e.g. server restart) — reconstruct from DB
+      const playerIds = [gameRow.user1Id, gameRow.user2Id, gameRow.user3Id, gameRow.user4Id].filter(Boolean) as string[];
+      lobby = { teamA: [], teamB: [] };
+      for (const pid of playerIds) {
+        if (lobby.teamA.length < 2) lobby.teamA.push(pid);
+        else lobby.teamB.push(pid);
+      }
+      teamLobbies.set(gameRow.id, lobby);
     }
 
     const allPlayers = [...lobby.teamA, ...lobby.teamB];
@@ -133,8 +139,18 @@ export function createTeamLobby(gameId: string, creatorId: string) {
   teamLobbies.set(gameId, { teamA: [creatorId], teamB: [] });
 }
 
-export function getTeamLobby(gameId: string) {
-  const lobby = teamLobbies.get(gameId);
+export function getTeamLobby(gameId: string, gameRow?: { user1Id: string; user2Id: string | null; user3Id: string | null; user4Id: string | null }) {
+  let lobby = teamLobbies.get(gameId);
+  if (!lobby && gameRow) {
+    // Reconstruct from DB after server restart
+    const playerIds = [gameRow.user1Id, gameRow.user2Id, gameRow.user3Id, gameRow.user4Id].filter(Boolean) as string[];
+    lobby = { teamA: [], teamB: [] };
+    for (const pid of playerIds) {
+      if (lobby.teamA.length < 2) lobby.teamA.push(pid);
+      else lobby.teamB.push(pid);
+    }
+    teamLobbies.set(gameId, lobby);
+  }
   if (!lobby) return null;
   return buildLobbyUpdate(lobby);
 }
