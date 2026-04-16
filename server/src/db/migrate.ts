@@ -26,12 +26,15 @@ export function ensureTables() {
       "status" text NOT NULL,
       "user1_id" text NOT NULL REFERENCES "user"("id"),
       "user2_id" text REFERENCES "user"("id"),
+      "user3_id" text REFERENCES "user"("id"),
+      "user4_id" text REFERENCES "user"("id"),
       "winner_id" text REFERENCES "user"("id"),
       "state" text,
       "created_at" integer NOT NULL DEFAULT (unixepoch()),
       "updated_at" integer NOT NULL DEFAULT (unixepoch())
     );
     CREATE UNIQUE INDEX IF NOT EXISTS "game_code_unique" ON "game" ("code");
+
 
     -- Sentinel row for the AI opponent
     INSERT OR IGNORE INTO "user" ("id", "display_name", "session_token")
@@ -47,6 +50,18 @@ export function ensureTables() {
       "created_at" integer NOT NULL DEFAULT (unixepoch())
     );
   `);
+
+  // Add team player columns to existing game tables
+  const columns = sqlite
+    .prepare(`PRAGMA table_info("game")`)
+    .all()
+    .map((c: any) => c.name as string);
+  if (!columns.includes("user3_id")) {
+    sqlite.exec(`ALTER TABLE "game" ADD COLUMN "user3_id" text REFERENCES "user"("id")`);
+  }
+  if (!columns.includes("user4_id")) {
+    sqlite.exec(`ALTER TABLE "game" ADD COLUMN "user4_id" text REFERENCES "user"("id")`);
+  }
 
   sqlite.close();
 }

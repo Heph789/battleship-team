@@ -8,8 +8,10 @@ import { getOrCreateUser } from "./auth/session.js";
 const PORT = Number(process.env.PORT ?? 3001);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:3000";
 
+const corsOrigin = CLIENT_ORIGIN === "*" ? true : CLIENT_ORIGIN;
+
 const app = express();
-app.use(cors({ origin: CLIENT_ORIGIN }));
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
@@ -28,7 +30,7 @@ app.get("/api/session", (req, res) => {
 });
 
 const server = http.createServer(app);
-createSocketServer(server, CLIENT_ORIGIN);
+createSocketServer(server, corsOrigin);
 
 ensureTables();
 

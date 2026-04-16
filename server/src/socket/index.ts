@@ -23,7 +23,7 @@ export type TypedSocket = Parameters<
 
 export function createSocketServer(
   httpServer: http.Server,
-  clientOrigin: string,
+  clientOrigin: string | boolean,
 ) {
   const io: TypedServer = new SocketServer(httpServer, {
     cors: { origin: clientOrigin },
