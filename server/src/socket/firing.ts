@@ -30,6 +30,11 @@ export function registerFiringHandlers(io: TypedServer, socket: TypedSocket) {
       return;
     }
 
+    if (gameRow.mode === "team") {
+      socket.emit("error", { message: "Use team_fire for team mode" });
+      return;
+    }
+
     const state = gameRow.state as unknown as ServerGameState;
 
     if (state.currentTurn !== userId) {

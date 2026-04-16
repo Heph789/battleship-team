@@ -65,7 +65,7 @@ export type GameState = {
 
 // --- Server types ---
 
-export type GameMode = "ai" | "multiplayer";
+export type GameMode = "ai" | "multiplayer" | "team";
 
 export type GameStatus =
   | "waiting"
@@ -88,6 +88,39 @@ export type ServerGameState = {
   boards: Record<string, PlayerBoard>;
   currentTurn: string; // usedId
   aiState: AIState | null;
+  teamState: TeamGameState | null;
+};
+
+// --- Team mode types ---
+
+export type TeamId = "teamA" | "teamB";
+
+export type TeamPlayerState = {
+  ready: boolean;
+  hitCount: number;
+};
+
+export type TeamTurnPhase = "firing" | "sharing" | "waiting";
+
+export type TeamShotResult = {
+  coordinate: Coordinate;
+  result: "hit" | "miss" | "sunk" | "wasted";
+  shipType?: ShipType;
+  sunkShip?: ShipPlacement;
+  alreadyHitBy?: string;
+  revealedSunkShip?: ShipPlacement;
+};
+
+export type TeamGameState = {
+  teams: Record<TeamId, { playerIds: string[] }>;
+  boards: Record<TeamId, PlayerBoard>;
+  playerViews: Record<string, PlayerBoard>;
+  players: Record<string, TeamPlayerState>;
+  placementShips: Record<TeamId, ShipPlacement[]>;
+  currentTeamTurn: TeamId;
+  turnPhase: TeamTurnPhase;
+  pendingShots: Record<string, { x: number; y: number } | null>;
+  pendingResults: Record<string, TeamShotResult | null>;
 };
 
 // --- Socket.IO event interfaces ---
@@ -100,6 +133,13 @@ export interface ClientToServerEvents {
   place_ships: (data: { ships: ShipPlacement[] }) => void;
   fire: (data: { x: number; y: number }) => void;
   rematch: (data: { gameId: string }) => void;
+  // Team mode
+  join_team_game: (data: { code: string }) => void;
+  team_place_ship: (data: { ship: ShipPlacement }) => void;
+  team_remove_ship: (data: { shipType: ShipType }) => void;
+  team_lock_in: () => void;
+  team_fire: (data: { x: number; y: number }) => void;
+  team_share_decision: (data: { share: boolean }) => void;
 }
 
 export interface ServerToClientEvents {
@@ -123,6 +163,48 @@ export interface ServerToClientEvents {
     currentTurn: string;
     winnerId: string | null;
     isYourTurn: boolean;
+    // Team mode fields (present when mode === "team")
+    teamId?: TeamId;
+    teams?: Record<TeamId, { playerIds: string[]; displayNames: string[] }>;
+    teamBoard?: PlayerBoard;
+    myEnemyView?: PlayerBoard;
+    hitCount?: number;
+    currentTeamTurn?: TeamId;
+    turnPhase?: TeamTurnPhase;
+    teammateReady?: boolean;
+    placementShips?: ShipPlacement[];
   }) => void;
   error: (data: { message: string }) => void;
+  // Team mode
+  team_lobby_update: (data: {
+    teams: Record<TeamId, { playerIds: string[]; displayNames: string[] }>;
+    playerCount: number;
+  }) => void;
+  teammate_placed_ship: (data: { ship: ShipPlacement }) => void;
+  teammate_removed_ship: (data: { shipType: ShipType }) => void;
+  teammate_locked_in: () => void;
+  team_both_ready: (data: {
+    currentTeamTurn: TeamId;
+  }) => void;
+  team_turn_start: (data: { currentTeamTurn: TeamId }) => void;
+  team_shot_result: (data: TeamShotResult & { phase: "share_prompt" | "done" }) => void;
+  team_waiting_for_teammate: () => void;
+  team_teammate_shot_done: () => void;
+  team_share_received: (data: {
+    coordinate: Coordinate;
+    result: "hit" | "sunk";
+    shipType?: ShipType;
+    sunkShip?: ShipPlacement;
+  }) => void;
+  team_round_complete: (data: { nextTeamTurn: TeamId }) => void;
+  team_opponent_turn_result: (data: {
+    hitsOnYourBoard: Coordinate[];
+    missesOnYourBoard: Coordinate[];
+    sunkShips: ShipPlacement[];
+  }) => void;
+  team_game_over: (data: {
+    winningTeam: TeamId;
+    hitCounts: Record<string, number>;
+    mvp: string;
+  }) => void;
 }

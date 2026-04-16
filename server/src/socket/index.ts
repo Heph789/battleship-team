@@ -9,6 +9,9 @@ import { registerLobbyHandlers } from "./lobby.js";
 import { registerPlacementHandlers } from "./placement.js";
 import { registerFiringHandlers } from "./firing.js";
 import { registerRematchHandlers } from "./rematch.js";
+import { registerTeamLobbyHandlers } from "./team-lobby.js";
+import { registerTeamPlacementHandlers } from "./team-placement.js";
+import { registerTeamFiringHandlers } from "./team-firing.js";
 
 export type TypedServer = SocketServer<
   ClientToServerEvents,
@@ -46,6 +49,9 @@ export function createSocketServer(
     registerPlacementHandlers(io, s);
     registerFiringHandlers(io, s);
     registerRematchHandlers(io, s);
+    registerTeamLobbyHandlers(io, s);
+    registerTeamPlacementHandlers(io, s);
+    registerTeamFiringHandlers(io, s);
   });
 
   return io;

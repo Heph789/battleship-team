@@ -7,14 +7,20 @@ import { getSocket } from "@/lib/socket";
 import PlacementView from "@/components/placement/PlacementView";
 import BattleView from "@/components/battle/BattleView";
 import GameOverView from "@/components/game-over/GameOverView";
+import TeamPlacementView from "@/components/placement/TeamPlacementView";
+import TeamBattleView from "@/components/battle/TeamBattleView";
+import TeamGameOverView from "@/components/game-over/TeamGameOverView";
 
 export default function GamePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const gameId = useGameStore((s) => s.gameId);
   const gameStatus = useGameStore((s) => s.gameStatus);
+  const gameMode = useGameStore((s) => s.gameMode);
   const waitingForOpponent = useGameStore((s) => s.waitingForOpponent);
   const gameCode = useGameStore((s) => s.gameCode);
+  const teams = useGameStore((s) => s.teams);
+  const teamPlayerCount = useGameStore((s) => s.teamPlayerCount);
   const connected = useGameStore((s) => s.connected);
   const initSession = useGameStore((s) => s.initSession);
   const attemptedReconnect = useRef(false);
@@ -63,6 +69,48 @@ export default function GamePage() {
   }
 
   if (gameStatus === "waiting") {
+    if (gameMode === "team") {
+      return (
+        <div className="flex flex-1 flex-col items-center justify-center gap-6">
+          <h2 className="text-2xl font-bold">Team Lobby</h2>
+          {gameCode && (
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-slate-400">Share this code:</p>
+              <p className="text-5xl font-mono font-bold tracking-widest text-amber-400">
+                {gameCode}
+              </p>
+            </div>
+          )}
+          <p className="text-slate-400">
+            Players: {teamPlayerCount}/4
+          </p>
+          {teams && (
+            <div className="flex gap-8">
+              <div className="flex flex-col items-center gap-2">
+                <h3 className="font-semibold text-blue-400">Team A</h3>
+                {teams.teamA.displayNames.map((name, i) => (
+                  <p key={i} className="text-slate-300">{name}</p>
+                ))}
+                {teams.teamA.playerIds.length < 2 && (
+                  <p className="text-slate-600 italic">Waiting...</p>
+                )}
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <h3 className="font-semibold text-red-400">Team B</h3>
+                {teams.teamB.displayNames.map((name, i) => (
+                  <p key={i} className="text-slate-300">{name}</p>
+                ))}
+                {Array.from({ length: 2 - teams.teamB.playerIds.length }).map((_, i) => (
+                  <p key={i} className="text-slate-600 italic">Waiting...</p>
+                ))}
+              </div>
+            </div>
+          )}
+          <p className="text-slate-500 animate-pulse">Waiting for players to join...</p>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-6">
         <h2 className="text-2xl font-bold">Waiting for Opponent</h2>
@@ -86,6 +134,12 @@ export default function GamePage() {
         <p className="text-slate-500 animate-pulse">Waiting for opponent to place their ships...</p>
       </div>
     );
+  }
+
+  if (gameMode === "team") {
+    if (gameStatus === "placing_ships") return <TeamPlacementView />;
+    if (gameStatus === "in_progress") return <TeamBattleView />;
+    if (gameStatus === "completed") return <TeamGameOverView />;
   }
 
   if (gameStatus === "placing_ships") return <PlacementView />;
